@@ -1,13 +1,7 @@
-import {
-	useLogin,
-	useLogout,
-	usePrivy,
-	type WalletWithMetadata,
-} from "@privy-io/react-auth";
+import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { useAccount } from "wagmi";
 import { Copy } from "lucide-react";
-import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import FunPurpleButton from "./FunPurpleButton";
 import { Button } from "./ui/button";
 
 type LoginButtonProps = {
@@ -15,58 +9,24 @@ type LoginButtonProps = {
 };
 
 export default function LoginButton({ resetGame }: LoginButtonProps) {
-	const { login } = useLogin();
-	const { user, authenticated } = usePrivy();
+	const { isConnected } = useAccount();
 
-	const [loginLoading, setLoginLoading] = useState(false);
-
-	const handleLogin = async () => {
-		setLoginLoading(true);
-		try {
-			login();
-			setLoginLoading(false);
-		} catch (err) {
-			console.log("Problem logging in: ", err);
-			setLoginLoading(false);
-		}
-	};
-
-	if (user && authenticated) {
-		return <FunPurpleButton text="New Game" onClick={resetGame} />;
+	if (isConnected) {
+		return (
+			<button
+				onClick={resetGame}
+				className="px-8 py-3 font-bold text-gray-900 bg-white rounded-xl hover:scale-105 active:scale-95 transition-all shadow-[0_8px_0_rgb(200,200,200)] hover:shadow-[0_6px_0_rgb(200,200,200)]"
+			>
+				New Game
+			</button>
+		);
 	}
 
-	return (
-		<FunPurpleButton
-			text="Login"
-			loadingText="Creating player..."
-			isLoading={loginLoading}
-			onClick={() => handleLogin()}
-		/>
-	);
+	return <ConnectButton />;
 }
 
 export function PlayerInfo() {
-	const { logout } = useLogout();
-	const { user } = usePrivy();
-
-	const [address, setAddress] = useState("");
-	useEffect(() => {
-		if (!user) {
-			setAddress("");
-			return;
-		}
-
-		const [privyUser] = user.linkedAccounts.filter(
-			(account): account is WalletWithMetadata =>
-				account.type === "wallet" && account.walletClientType === "privy",
-		);
-		if (!privyUser || !privyUser.address) {
-			setAddress("");
-			return;
-		}
-
-		setAddress(privyUser.address);
-	}, [user]);
+	const { address } = useAccount();
 
 	const copyToClipboard = async () => {
 		if (address) {
@@ -92,14 +52,6 @@ export function PlayerInfo() {
 				onClick={copyToClipboard}
 			>
 				<Copy className="h-3.5 w-3.5" />
-			</Button>
-			<span className="text-gray-400 mx-1">|</span>
-			<Button
-				variant="ghost"
-				className="underline text-sm p-0 h-auto"
-				onClick={logout}
-			>
-				Logout
 			</Button>
 		</div>
 	);

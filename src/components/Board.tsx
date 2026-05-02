@@ -44,17 +44,17 @@ export default function Board({
     const getTileColor = (value: number) => {
         switch (value) {
             case 2:
-                return "bg-purple-100 text-gray-800";
+                return "bg-white text-gray-800";
             case 4:
-                return "bg-purple-200 text-gray-800";
+                return "bg-gray-100 text-gray-800";
             case 8:
-                return "bg-purple-300 text-gray-800";
+                return "bg-gray-200 text-gray-800";
             case 16:
-                return "bg-purple-400 text-white";
+                return "bg-gray-300 text-gray-800";
             case 32:
-                return "bg-purple-500 text-white";
+                return "bg-gray-400 text-white";
             case 64:
-                return "bg-purple-600 text-white";
+                return "bg-gray-500 text-white";
             case 128:
                 return "bg-amber-300 text-gray-800";
             case 256:
@@ -66,7 +66,7 @@ export default function Board({
             case 2048:
                 return "bg-amber-700 text-white";
             default:
-                return "bg-purple-800 text-white";
+                return "bg-gray-700 text-white";
         }
     };
 
@@ -147,21 +147,26 @@ export default function Board({
                 {/* Game error overlay */}
                 {gameError && (
                     <div className="absolute inset-0 flex items-center justify-center rounded-lg z-20">
-                        <div className="p-6 bg-white rounded-lg text-center">
+                        <div className="p-6 bg-white rounded-lg text-center max-w-sm">
                             <h2 className="text-2xl font-bold mb-4">
                                 Oops! Game Error :(
                             </h2>
-                            <p className="mb-2 text-red-500">
-                                <span className="text-red-600 font-bold">
-                                    Error
-                                </span>
-                                : {gameErrorText}
+                            <p className="mb-2 text-red-500 text-sm break-words">
+                                {gameErrorText}
                             </p>
                             <p className="mb-4">Your score: {score}</p>
-                            <FunPurpleButton
-                                text="Re-sync game"
-                                onClick={resyncGame}
-                            />
+                            <div className="flex flex-col gap-2">
+                                <FunPurpleButton
+                                    text="Re-sync game"
+                                    onClick={resyncGame}
+                                />
+                                <button
+                                    onClick={initializeGame}
+                                    className="text-sm text-gray-500 hover:text-gray-700 underline"
+                                >
+                                    Start fresh instead
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}

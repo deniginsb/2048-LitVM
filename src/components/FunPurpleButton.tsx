@@ -29,8 +29,8 @@ export default function FunPurpleButton({
             className={`
         relative
         px-8 py-3
-        font-bold text-white
-        bg-purple-600
+        font-bold text-gray-900
+        bg-white
         rounded-xl
         transform
         transition-all duration-150
@@ -38,9 +38,9 @@ export default function FunPurpleButton({
         active:scale-95
         disabled:opacity-70
         disabled:cursor-not-allowed
-        shadow-[0_8px_0_rgb(107,33,168)]
-        hover:shadow-[0_6px_0_rgb(107,33,168)]
-        active:shadow-[0_4px_0_rgb(107,33,168)]
+        shadow-[0_8px_0_rgb(200,200,200)]
+        hover:shadow-[0_6px_0_rgb(200,200,200)]
+        active:shadow-[0_4px_0_rgb(200,200,200)]
         ${isPressed ? "translate-y-2" : ""}
         before:absolute
         before:content-['']

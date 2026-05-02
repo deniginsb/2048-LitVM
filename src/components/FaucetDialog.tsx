@@ -1,8 +1,8 @@
-import { usePrivy, type WalletWithMetadata } from "@privy-io/react-auth";
-import { ArrowUpRight, Copy, Loader2, RefreshCw } from "lucide-react";
+import { Copy, Loader2, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { formatEther, type Hex } from "viem";
+import { useAccount, useSendTransaction, useWaitForTransactionReceipt } from "wagmi";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -14,6 +14,7 @@ import {
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useNetwork } from "@/contexts/NetworkContext";
+import { useSessionWallet } from "@/contexts/SessionWalletContext";
 import { Button } from "./ui/button";
 
 export type FaucetDialogProps = {
@@ -26,43 +27,70 @@ export function FaucetDialog({
 	setIsOpen,
 	resyncGame,
 }: FaucetDialogProps) {
-	const { user } = usePrivy();
+	const { address: mainAddress } = useAccount();
+	const { sessionWallet } = useSessionWallet();
 	const { publicClient, network } = useNetwork();
+	const { sendTransaction, data: txHash, isPending: isSending, reset: resetTx } = useSendTransaction();
 
-	const [address, setAddress] = useState("");
 	const [balance, setBalance] = useState(0n);
+	const [sessionBalance, setSessionBalance] = useState(0n);
 	const [resumeLoading, setResumeLoading] = useState(false);
 	const [refreshingBalance, setRefreshingBalance] = useState(false);
+	const [fundingSession, setFundingSession] = useState(false);
+
+	const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+		hash: txHash,
+	});
+
+	const sessionAddress = sessionWallet?.address;
 
 	async function setupUser() {
-		if (!user) {
-			setAddress("");
+		if (!sessionAddress) {
 			setBalance(0n);
+			setSessionBalance(0n);
 			return;
 		}
 
-		const [privyUser] = user.linkedAccounts.filter(
-			(account): account is WalletWithMetadata =>
-				account.type === "wallet" && account.walletClientType === "privy",
-		);
-		if (!privyUser || !privyUser.address) {
-			setAddress("");
-			setBalance(0n);
-			return;
+		// Get main wallet balance
+		if (mainAddress) {
+			try {
+				const mainBal = await publicClient.getBalance({
+					address: mainAddress as Hex,
+				});
+				setBalance(mainBal);
+			} catch (e) {
+				console.error("Failed to get main balance:", e);
+			}
 		}
-		const privyUserAddress = privyUser.address;
 
-		const bal = await publicClient.getBalance({
-			address: privyUserAddress as Hex,
-		});
-
-		setAddress(privyUserAddress);
-		setBalance(bal);
+		// Get session wallet balance
+		try {
+			const sessionBal = await publicClient.getBalance({
+				address: sessionAddress as Hex,
+			});
+			setSessionBalance(sessionBal);
+		} catch (e) {
+			console.error("Failed to get session balance:", e);
+		}
 	}
+
+	// When tx confirms, refresh balances
+	useEffect(() => {
+		if (isConfirmed) {
+			toast.success("Session wallet funded!");
+			setFundingSession(false);
+			resetTx();
+			setupUser();
+		}
+	}, [isConfirmed]);
 
 	const handleClose = async () => {
 		setResumeLoading(true);
-		await resyncGame();
+		try {
+			await resyncGame();
+		} catch (e) {
+			console.error("Resync failed:", e);
+		}
 		setResumeLoading(false);
 		setIsOpen(false);
 	};
@@ -73,95 +101,94 @@ export function FaucetDialog({
 		setRefreshingBalance(false);
 	};
 
+	const handleFundSession = async () => {
+		if (!sessionAddress) return;
+		setFundingSession(true);
+		try {
+			sendTransaction({
+				to: sessionAddress as Hex,
+				value: BigInt("50000000000000000"), // 0.05 zkLTC
+			});
+			toast.info("Confirm the transaction in your wallet...");
+		} catch (err) {
+			console.error("Failed to fund session:", err);
+			toast.error("Failed to fund session wallet");
+			setFundingSession(false);
+		}
+	};
+
 	useEffect(() => {
 		if (!isOpen) return;
 		setupUser();
-	}, [user, isOpen, network]);
+	}, [sessionAddress, isOpen, network]);
 
-	const abbreviatedAddress = address
-		? `${address.slice(0, 4)}...${address.slice(-2)}`
+	const abbreviatedSessionAddress = sessionAddress
+		? `${sessionAddress.slice(0, 6)}...${sessionAddress.slice(-4)}`
 		: "";
 
 	const copyToClipboard = async () => {
-		if (address) {
-			await navigator.clipboard.writeText(address);
+		if (sessionAddress) {
+			await navigator.clipboard.writeText(sessionAddress);
 			toast.info("Copied to clipboard.");
 		}
 	};
 
-	const alreadyFunded = parseFloat(formatEther(balance)) >= 0.5;
+	const sessionHasBalance = parseFloat(formatEther(sessionBalance)) >= 0.01;
 
 	return (
 		<AlertDialog open={isOpen}>
 			<AlertDialogContent className="bg-yellow-600 w-[95vw] max-w-md sm:max-w-lg rounded-lg px-4 py-6 overflow-y-auto max-h-[90vh]">
 				<AlertDialogHeader>
 					<AlertDialogTitle className="text-black text-center">
-						You need ~0.1 MON more to play moves.
+						Fund your session wallet to play
 					</AlertDialogTitle>
 					<AlertDialogDescription asChild>
 						<div className="flex flex-col gap-3 text-sm sm:text-base text-gray-800">
-							<div className="flex items-center justify-center gap-2 text-purple-800 break-all">
-								<span className="text-gray-800">
-									{`Player: ${abbreviatedAddress}`}
-								</span>
-
-								<Button
-									variant="ghost"
-									size="icon"
-									className="h-6 w-6 p-1"
-									onClick={copyToClipboard}
-									aria-label="Copy player address"
-								>
+							<div className="flex items-center justify-center gap-2 text-gray-800 break-all">
+								<span>Session: {abbreviatedSessionAddress}</span>
+								<Button variant="ghost" size="icon" className="h-6 w-6 p-1" onClick={copyToClipboard}>
 									<Copy className="h-4 w-4" />
 								</Button>
 							</div>
-							<div className="text-purple-800 flex items-center justify-center gap-2">
-								<span className="text-gray-800">Balance</span>:{" "}
-								{formatEther(balance)} MON
-								<Button
-									variant="ghost"
-									size="icon"
-									className="h-6 w-6 p-1"
-									onClick={handleRefreshBalance}
-									disabled={refreshingBalance}
-									aria-label="Refresh balance"
-								>
-									<RefreshCw
-										className={`h-4 w-4 ${refreshingBalance ? "animate-spin" : ""}`}
-									/>
+							<div className="text-gray-800 flex items-center justify-center gap-2">
+								<span>Session Balance</span>: {formatEther(sessionBalance)} zkLTC
+								<Button variant="ghost" size="icon" className="h-6 w-6 p-1" onClick={handleRefreshBalance} disabled={refreshingBalance}>
+									<RefreshCw className={`h-4 w-4 ${refreshingBalance ? "animate-spin" : ""}`} />
 								</Button>
 							</div>
+							<div className="text-gray-800 flex items-center justify-center gap-2">
+								<span>Main Wallet</span>: {formatEther(balance)} zkLTC
+							</div>
 							<p className="text-center">
-								Fund your player address with testnet MON directly via your
-								external wallet, or get 0.5 MON from the game faucet.
+								The game uses a session wallet for fast moves without popup confirmations.
+								Fund it with your main wallet to start playing.
 							</p>
 						</div>
 					</AlertDialogDescription>
 				</AlertDialogHeader>
 				<AlertDialogFooter>
 					<AlertDialogCancel
-						disabled={!alreadyFunded}
+						disabled={!sessionHasBalance}
 						onClick={handleClose}
-						className="bg-blue-500 text-white hover:bg-blue-600"
+						className="bg-white text-gray-900 hover:bg-gray-100"
 					>
 						{resumeLoading && <Loader2 className="w-5 h-5 animate-spin mr-2" />}
-						{!resumeLoading ? "Resume" : "Re-sycing..."}
+						{!resumeLoading ? "Resume" : "Re-syncing..."}
 					</AlertDialogCancel>
 					<AlertDialogAction asChild>
 						<Button
-							className="outline outline-white bg-purple-600 text-white hover:bg-purple-700"
-							disabled={alreadyFunded}
-							asChild
+							className="outline outline-gray-300 bg-white text-gray-900 hover:bg-gray-100"
+							disabled={sessionHasBalance || fundingSession || isSending || isConfirming}
+							onClick={handleFundSession}
 						>
-							<a
-								href="https://faucet.monad.xyz"
-								target="_blank"
-								className="flex items-center"
-								rel="noopener"
-							>
-								<p>Fund via faucet</p>
-								<ArrowUpRight className="w-4 h-4 ml-1" />
-							</a>
+							{fundingSession || isSending || isConfirming ? (
+								<>
+									<Loader2 className="w-5 h-5 animate-spin mr-2" />
+									{isConfirming ? "Confirming..." : "Funding..."}
+								</>
+							) : (
+								"Fund Session (0.05 zkLTC)"
+							)}
 						</Button>
 					</AlertDialogAction>
 				</AlertDialogFooter>

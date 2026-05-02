@@ -1,32 +1,30 @@
 import "./index.css";
+import "@rainbow-me/rainbowkit/styles.css";
 
-import { PrivyProvider } from "@privy-io/react-auth";
+import { RainbowKitProvider, darkTheme } from "@rainbow-me/rainbowkit";
+import { WagmiProvider } from "wagmi";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { monad, monadTestnet } from "viem/chains";
+import { config } from "./config/wagmi";
 import App from "./App.tsx";
 import { NetworkProvider } from "./contexts/NetworkContext";
+import { SessionWalletProvider } from "./contexts/SessionWalletContext";
+
+const queryClient = new QueryClient();
 
 createRoot(document.getElementById("root")!).render(
 	<StrictMode>
-		<PrivyProvider
-			appId={import.meta.env.VITE_PRIVY_APP_ID}
-			config={{
-				appearance: {
-					theme: "light",
-					walletChainType: "ethereum-only",
-				},
-				defaultChain: monadTestnet,
-				supportedChains: [monadTestnet, monad],
-				loginMethods: ["google", "passkey", "wallet"],
-				embeddedWallets: {
-					ethereum: { createOnLogin: "all-users" },
-				},
-			}}
-		>
-			<NetworkProvider>
-				<App />
-			</NetworkProvider>
-		</PrivyProvider>
+		<WagmiProvider config={config}>
+			<QueryClientProvider client={queryClient}>
+				<RainbowKitProvider theme={darkTheme()} modalSize="compact">
+					<SessionWalletProvider>
+						<NetworkProvider>
+							<App />
+						</NetworkProvider>
+					</SessionWalletProvider>
+				</RainbowKitProvider>
+			</QueryClientProvider>
+		</WagmiProvider>
 	</StrictMode>,
 );

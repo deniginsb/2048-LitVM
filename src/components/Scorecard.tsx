@@ -39,8 +39,8 @@ export default function Scorecard({ score }: ScorecardProps) {
 	}, [score, displayScore]);
 
 	return (
-		<Card className="p-4 text-center bg-purple-600 font-bold border-none shadow-[0_8px_0_rgb(107,33,168)] uppercase tracking-widest">
-			<h2 className="text-sm font-bold text-white">SCORE</h2>
+		<Card className="p-4 text-center bg-white text-gray-900 font-bold border-none shadow-[0_8px_0_rgb(200,200,200)] uppercase tracking-widest">
+			<h2 className="text-sm font-bold text-gray-900">SCORE</h2>
 			<p className="text-4xl font-extrabold text-yellow-400 retro-number">
 				{displayScore}
 			</p>

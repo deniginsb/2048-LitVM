@@ -1,14 +1,8 @@
 import { createContext, type ReactNode, useContext, useState } from "react";
-import type { Chain, PublicClient } from "viem";
-import { monad, monadTestnet } from "viem/chains";
-import {
-	mainnetPublicClient,
-	mainnetRpc,
-	testnetPublicClient,
-	testnetRpc,
-} from "@/utils/client";
+import { type Chain, createPublicClient, http, type PublicClient } from "viem";
+import { litvmTestnet } from "@/config/wagmi";
 
-export type Network = "mainnet" | "testnet";
+export type Network = "testnet";
 
 type NetworkContextType = {
 	network: Network;
@@ -19,36 +13,25 @@ type NetworkContextType = {
 	explorerUrl: string;
 };
 
+const testnetRpc = litvmTestnet.rpcUrls.default.http[0];
+
+const testnetPublicClient = createPublicClient({
+	chain: litvmTestnet,
+	transport: http(testnetRpc),
+});
+
 const NetworkContext = createContext<NetworkContextType | null>(null);
 
-function getNetworkFromUrl(): Network {
-	const params = new URLSearchParams(window.location.search);
-	const network = params.get("network");
-	return network === "mainnet" ? "mainnet" : "testnet";
-}
-
-function updateUrlParam(network: Network) {
-	const url = new URL(window.location.href);
-	if (network === "testnet") {
-		url.searchParams.delete("network");
-	} else {
-		url.searchParams.set("network", network);
-	}
-	window.history.replaceState({}, "", url.toString());
-}
-
 export function NetworkProvider({ children }: { children: ReactNode }) {
-	const [network, setNetworkState] = useState<Network>(getNetworkFromUrl);
+	const [network] = useState<Network>("testnet");
 
-	const setNetwork = (newNetwork: Network) => {
-		setNetworkState(newNetwork);
-		updateUrlParam(newNetwork);
+	const setNetwork = (_newNetwork: Network) => {
+		// Only testnet supported
 	};
 
-	const chain = network === "mainnet" ? monad : monadTestnet;
-	const publicClient =
-		network === "mainnet" ? mainnetPublicClient : testnetPublicClient;
-	const rpcUrl = network === "mainnet" ? mainnetRpc : testnetRpc;
+	const chain = litvmTestnet;
+	const publicClient = testnetPublicClient;
+	const rpcUrl = testnetRpc;
 
 	return (
 		<NetworkContext.Provider

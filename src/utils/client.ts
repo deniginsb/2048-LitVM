@@ -1,30 +1,44 @@
-import { createPublicClient, http, type PublicClient } from "viem";
-import { monad, monadTestnet } from "viem/chains";
+import { createPublicClient, http, type PublicClient, defineChain } from "viem";
+
+export const litvmTestnet = defineChain({
+	id: 4441,
+	name: "LitVM LiteForge",
+	nativeCurrency: {
+		name: "zkLTC",
+		symbol: "zkLTC",
+		decimals: 18,
+	},
+	rpcUrls: {
+		default: {
+			http: ["https://liteforge.rpc.caldera.xyz/http"],
+			ws: ["wss://liteforge.rpc.caldera.xyz/ws"],
+		},
+	},
+	blockExplorers: {
+		default: {
+			name: "LiteForge Explorer",
+			url: "https://liteforge.explorer.caldera.xyz",
+		},
+	},
+});
 
 export const testnetRpc =
-	import.meta.env.VITE_MONAD_TESTNET_RPC_URL ||
-	monadTestnet.rpcUrls.default.http[0];
-export const mainnetRpc =
-	import.meta.env.VITE_MONAD_MAINNET_RPC_URL || monad.rpcUrls.default.http[0];
+	import.meta.env.VITE_LITVM_TESTNET_RPC_URL ||
+	litvmTestnet.rpcUrls.default.http[0];
 
 export const testnetPublicClient = createPublicClient({
-	chain: monadTestnet,
+	chain: litvmTestnet,
 	transport: http(testnetRpc),
-});
-export const mainnetPublicClient = createPublicClient({
-	chain: monad,
-	transport: http(mainnetRpc),
 });
 
 type FeeCache = { maxFeePerGas: bigint; maxPriorityFeePerGas: bigint };
-const cachedFees: { testnet: FeeCache | null; mainnet: FeeCache | null } = {
+const cachedFees: { testnet: FeeCache | null } = {
 	testnet: null,
-	mainnet: null,
 };
 
 export async function getEstimatedFees(
 	publicClient: PublicClient,
-	network: "mainnet" | "testnet",
+	network: "testnet",
 ): Promise<FeeCache> {
 	if (cachedFees[network]) {
 		return cachedFees[network];

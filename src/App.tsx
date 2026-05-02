@@ -1,4 +1,3 @@
-import { usePrivy, type WalletWithMetadata } from "@privy-io/react-auth";
 import { useEffect, useRef, useState } from "react";
 import {
 	encodePacked,
@@ -8,6 +7,7 @@ import {
 	keccak256,
 	toBytes,
 	toHex,
+	formatEther,
 } from "viem";
 import { Toaster } from "@/components/ui/sonner";
 import Board from "./components/Board";
@@ -17,6 +17,9 @@ import LoginButton, { PlayerInfo } from "./components/LoginButton";
 import NetworkToggle from "./components/NetworkToggle";
 import Scorecard from "./components/Scorecard";
 import { useTransactions } from "./hooks/useTransactions";
+import { useAccount } from "wagmi";
+import { useSessionWallet } from "./contexts/SessionWalletContext";
+import { useNetwork } from "./contexts/NetworkContext";
 
 // Types
 enum Direction {
@@ -47,7 +50,9 @@ export default function Game2048() {
 	//                      Custom Hook Values                      //
 	// =============================================================//
 
-	const { user } = usePrivy();
+const { address, isConnected } = useAccount();
+const { sessionWallet } = useSessionWallet();
+const { publicClient } = useNetwork();
 
 	const {
 		resetNonceAndBalance,
@@ -133,7 +138,7 @@ export default function Game2048() {
 		if (!container) return;
 
 		const handleKeyDown = async (event: KeyboardEvent) => {
-			if (!user || gameOver || isAnimating || faucetModalOpen) return;
+			if (!isConnected || gameOver || isAnimating || faucetModalOpen) return;
 
 			switch (event.key) {
 				case "ArrowUp":
@@ -155,14 +160,14 @@ export default function Game2048() {
 		let touchStartY = 0;
 
 		const handleTouchStart = (e: TouchEvent) => {
-			e.preventDefault(); // 👈 this is key to prevent scroll
+			e.preventDefault();
 			touchStartX = e.changedTouches[0].screenX;
 			touchStartY = e.changedTouches[0].screenY;
 		};
 
 		const handleTouchEnd = async (e: TouchEvent) => {
-			e.preventDefault(); // 👈 also here
-			if (!user || gameOver || isAnimating) return;
+			e.preventDefault();
+			if (!isConnected || gameOver || isAnimating) return;
 
 			const touchEndX = e.changedTouches[0].screenX;
 			const touchEndY = e.changedTouches[0].screenY;
@@ -182,7 +187,7 @@ export default function Game2048() {
 		window.addEventListener("keydown", handleKeyDown);
 		container.addEventListener("touchstart", handleTouchStart, {
 			passive: false,
-		}); // 👈 passive: false is REQUIRED
+		});
 		container.addEventListener("touchend", handleTouchEnd, {
 			passive: false,
 		});
@@ -345,27 +350,26 @@ export default function Game2048() {
 	//                      Initialize new game                     //
 	// =============================================================//
 
-	const [address, setAddress] = useState("");
-	useEffect(() => {
-		if (!user) {
-			setAddress("");
-			return;
-		}
-
-		const [privyUser] = user.linkedAccounts.filter(
-			(account): account is WalletWithMetadata =>
-				account.type === "wallet" && account.walletClientType === "privy",
-		);
-		if (!privyUser || !privyUser.address) {
-			setAddress("");
-			return;
-		}
-
-		setAddress(privyUser.address);
-	}, [user]);
-
 	// Initialize the game with two random tiles
-	const initializeGame = () => {
+	const initializeGame = async () => {
+		// Check session wallet balance first
+	if (sessionWallet) {
+		try {
+			const balance = await publicClient.getBalance({ address: sessionWallet.address as Hex });
+			if (parseFloat(formatEther(balance)) < 0.01) {
+				setFaucetModalOpen(true);
+				return;
+			}
+		} catch (e) {
+			console.error("Session balance check failed:", e);
+			setFaucetModalOpen(true);
+			return;
+		}
+	} else {
+		setFaucetModalOpen(true);
+		return;
+	}
+
 		setResetBoards([]);
 
 		const newBoardState: BoardState = {
@@ -378,7 +382,7 @@ export default function Game2048() {
 		addRandomTile(newBoardState);
 
 		setPlayedMovesCount(1);
-		setActiveGameId(randomIDForAddress(address));
+		setActiveGameId(randomIDForAddress(address as Hex));
 		setEncodedMoves([tilesToEncodedMove(newBoardState.tiles, 0)]);
 
 		setBoardState(newBoardState);
@@ -721,7 +725,7 @@ export default function Game2048() {
 					<Scorecard score={boardState.score} />
 					<div className="flex flex-col items-end gap-4">
 						<LoginButton resetGame={initializeGame} />
-						{user && (
+						{isConnected && (
 							<>
 								<NetworkToggle
 									hasActiveGame={hasActiveGame}
